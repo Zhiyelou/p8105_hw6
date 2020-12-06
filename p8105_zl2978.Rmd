@@ -2,12 +2,13 @@
 title: "hw6_p8105_zl2978"
 author: "Zhiye Lou"
 date: "12/7/2020"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(viridis)
+library(modelr)
 knitr::opts_chunk$set(
 	echo = TRUE,
 	warning = FALSE,
@@ -85,5 +86,41 @@ models_results_df %>%
   geom_point() + 
   geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper)) + 
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+# Problem 2  
+I will first read and tidy the data.   
+```{r}
+birthweight = 
+  read_csv("./data/birthweight.csv") %>% 
+  janitor::clean_names() %>% 
+  mutate(babysex = recode(babysex, "1" = "male", "2" = "female"),
+         frace = recode(frace, "1" = "White", "2" = "Black", "3" = "Asian", "4" = "Puerto Rican", "8" = "Other", "9" = "Unknown"),
+         malform = recode(malform, "0" = "absent", "1" = "present"),
+         mrace = recode(mrace, "1" = "White", "2" = "Black", "3" = "Asian", "4" = "Puerto Rican", "8" = "Other"))
+number_of_na = sum(is.na(birthweight))
+check_incomelete = sum(!complete.cases(birthweight))
+```
+I will first use a backward stepwise to choose my factors.   
+```{r}
+fit1 = 
+  lm(bwt ~ ., data = birthweight) %>% 
+  step(direction = "backward", trace = 0) 
+fit1 %>% 
+  broom::tidy() %>% 
+  knitr::kable()
+```
+My predictors are babysex, bhead, blength, delwt, fincome, gaweeks, mheight, mrace, parity, ppwt and smoken.  
+My model was selected by using the backward stepwise, and then I will make a plot of model residuals against fitted values.  
+```{r}
+birthweight %>% 
+    add_predictions(fit1) %>% 
+    add_residuals(fit1) %>% 
+    ggplot(aes(x = pred, y = resid)) +
+        geom_point()  + 
+    geom_smooth() + 
+    labs(title = "Predicted vs Residuals", 
+       x = "Predicted", 
+       y = "Residuals")
 ```
 
