@@ -11,10 +11,11 @@ library(viridis)
 library(modelr)
 knitr::opts_chunk$set(
 	echo = TRUE,
+	fig.height = 6,
+	fig.width = 8,
+	message = FALSE,
 	warning = FALSE,
-	fig.width = 8, 
-  fig.height = 6,
-  out.width = "90%"
+	out.width = "90%"
 )
 options(
   ggplot2.continuous.colour = "viridis",
@@ -118,9 +119,55 @@ birthweight %>%
     add_residuals(fit1) %>% 
     ggplot(aes(x = pred, y = resid)) +
         geom_point()  + 
-    geom_smooth() + 
+    geom_smooth(method = "lm") + 
     labs(title = "Predicted vs Residuals", 
        x = "Predicted", 
        y = "Residuals")
 ```
+As we can see, the residuals are almost symmetrical to 0, and there is no obvious relationship between the predicted value since the points are clustered together and the line is almost flat.  
 
+Then I will compare my model to two other models.  
+```{r}
+## length at birth and gestational age as predictors (main effects only)
+fit2 = lm(bwt ~ blength + gaweeks, data = birthweight) 
+fit2 %>% 
+  broom::tidy() %>% 
+  knitr::kable()
+## One using head circumference, length, sex, and all interactions (including the three-way interaction)
+fit3 = lm(bwt ~ bhead * blength * babysex, data = birthweight) 
+fit3 %>% 
+  broom::tidy() %>% 
+  knitr::kable()
+```
+
+I will make the comparison by cross-validation.
+```{r}
+cv_birthweight = 
+    crossv_mc(birthweight, 200) %>% 
+    mutate(
+        train = map(train, as.tibble),
+        test = map(test,as.tibble)
+    ) %>% 
+   mutate(
+        my_model = map(train,~fit1),
+        model1 = map(train,~fit2),
+        model2 = map(train,~fit3)
+    ) %>% 
+    mutate(
+        rmse_my_model = map2_dbl(my_model, test, ~rmse(model = .x,data = .y)),
+        rmse_model1 = map2_dbl(model1, test, ~rmse(model = .x,data = .y)),
+        rmse_model2 = map2_dbl(model2, test, ~rmse(model = .x,data = .y))
+    )
+cv_birthweight %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
+```
+As the plot shown, my_model has the best distribution of RMSE, and the model with main effect only has the worst distribution of RMSE.
+
+# Problem 3  
